@@ -12,7 +12,7 @@
 
 ## HowIt
 Its pretty simple
-- Creating `ssdtool` file in select partition
+- Creating `ssdtool` file in selected partition
 - Count of blocks is writed at the beginning of this file (first 4 bytes)
 - It writes blocks of 4kb each
 - Each block contains a checksum of 16 bytes
