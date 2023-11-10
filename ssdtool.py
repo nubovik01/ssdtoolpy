@@ -2,7 +2,7 @@ import os, hashlib, random, time
 try: import psutil
 except ImportError:
     print("Please run pip3 install psutil"); exit(1)
-iter_speed = [time.time(), 0, 0]
+iter_speed = [0, 0, 0]
 
 def scan_disk(disk_path):
     bstat = [0, 0]
@@ -22,10 +22,7 @@ def scan_disk(disk_path):
                 bstat[0] += 1
             else: bstat[1] += 1
             
-            if time.time() - iter_speed[0] > 1:
-                iter_speed[0] = time.time()
-                iter_speed[2] = iter_speed[1]
-                iter_speed[1] = 0
+            if time.time() - iter_speed[0] > 1: iter_speed = [time.time(), 0, iter_speed[1]]
             print(f"{round((_/blocks)*100, 1)}% #{_}, BAD: {bstat[0]}, OK: {bstat[1]}, {round(iter_speed[2]/1024/1024, 2)}mb/s", end="\r", flush=1)
     print(f"\nAll is OK" if bstat[0] == 0 else f"\nCorrupted blocks! ({bstat[0]})")
                 
@@ -43,27 +40,25 @@ def write_random_blocks(disk_path, blocks=0):
         
         for _ in range(blocks):
             random_data = os.urandom(block_size)
-            random_data += hashlib.md5(random_data).digest()
-            f.write(random_data)
+            f.write(random_data + hashlib.md5(random_data).digest())
             
             iter_speed[1] += len(random_data)
             
                 
-            if _ % 256 == 0:
-                if time.time() - iter_speed[0] > 1:
-                    iter_speed[0] = time.time()
-                    iter_speed[2] = iter_speed[1]
-                    iter_speed[1] = 0
-                print(f"{round((_/blocks)*100, 1)}% Block #{_} on {round(iter_speed[2]/1024/1024, 2)}mb/s", end="\r", flush=1)
+            
+            if time.time() - iter_speed[0] > 1: iter_speed = [time.time(), 0, iter_speed[1]]
+            if _ % 64 == 0: print(f"{round((_/blocks)*100, 1)}% Block #{_} on {round(iter_speed[2]/1024/1024, 2)}mb/s", end="\r", flush=1)
 
 def main():
-    disks = psutil.disk_partitions()
+    try:
+        disks = psutil.disk_partitions() #also can return None or throw a exception (when running, for example on termux), so need to consider this....
+    except: disks = None
 
     if not disks:
         print("Try run as sudo, please.")
         return
 
-    print("Avaliable partitions: \n")
+    print("Avaliable partitions:\n")
     for i, disk in enumerate(disks):
         print(f"{i+1}. {disk.mountpoint} ({disk.device}, {disk.fstype.upper()})")
 
@@ -79,7 +74,7 @@ def main():
                 with open(test_file, "rb") as t:
                     blocks = int.from_bytes(t.read(4), "big")
                 if os.stat(test_file).st_size - 4 == blocks * 4096:
-                    print(f"There is {blocks} blocks written here, all is confirmed...")
+                    print("There is {} blocks written here...".format(blocks))
                     
                     if input("Read all of them? (Y/n) > ").lower() == "y":
                         scan_disk(selected_disk)
@@ -90,8 +85,8 @@ def main():
             if input("Read/Write (Y/n) > ").lower() == "y":
                 scan_disk(selected_disk)
             else:
-                print("Is {}MBytes free on selected partition".format(int(psutil.disk_usage(selected_disk).free/1024/1024)))
-                sz = input("Enter a int of MEGABYTES to be tested (or ENTER to all free space): ")
+                print("Is {}mb free on selected partition".format(int(psutil.disk_usage(selected_disk).free/1024/1024)))
+                sz = input("Enter count of MEGABYTES to be tested (or ENTER to all free space): ")
                 write_random_blocks(selected_disk, blocks=int(psutil.disk_usage(selected_disk).free / 4096)-1 if len(sz) == 0 else int((int(sz)*1024*1024)/4096))
                 print("\nAll is OK. Now you can read all of them or do it later (i advice exactly that)..")
     except ValueError:
