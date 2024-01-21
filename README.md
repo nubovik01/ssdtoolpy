@@ -16,3 +16,6 @@ Its pretty simple
 - Count of blocks is writed at the beginning of this file (first 4 bytes)
 - It writes blocks of 4kb each
 - Each block contains a checksum of 16 bytes
+
+## Credits
+Original author: https://github.com/rldv1
